@@ -1,0 +1,70 @@
+﻿@page "/"
+@using Microsoft.Data.Sqlite
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Index</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<SurveyPrompt Title="How is Blazor working for you?" />
+
+<button @onclick="RunEfCore">Run Ef Core</button>
+
+@code {
+    public class Name
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; }
+    }
+
+    public class TestDbCOntext : DbContext
+    {
+        public DbSet<Name> Names { get; set; } = default!;
+
+        public TestDbCOntext(DbContextOptions<TestDbCOntext> options) : base(options)
+        {
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Name>().ToTable("Names");
+            modelBuilder.Entity<Name>().HasIndex(x => x.FullName);
+            modelBuilder.Entity<Name>().Property(x => x.FullName).UseCollation("nocase");
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder options)
+        {
+            options.LogTo(Console.WriteLine, LogLevel.Warning)
+                   .EnableDetailedErrors()
+                   .EnableSensitiveDataLogging(true);
+        }
+    }
+
+    private async Task RunEfCore()
+    {
+        var connectionStringBuilder = new SqliteConnectionStringBuilder { DataSource = ":memory:" };
+        var connection = new SqliteConnection(connectionStringBuilder.ToString());
+
+        var options = new DbContextOptionsBuilder<TestDbCOntext>()
+           .UseSqlite(connection)
+           .Options;
+
+        using var db = new TestDbCOntext(options);
+        db.Database.OpenConnection();
+        await db.Database.EnsureCreatedAsync();
+        var nextId = db.Names!.Count() + 1;
+        db.Names.Add(new Name { Id = nextId, FullName = "Abdul Rahman" });
+        await db.SaveChangesAsync();
+
+        Console.WriteLine();
+        await foreach (var name in db.Names.AsAsyncEnumerable())
+        {
+            Console.WriteLine(name.FullName);
+        }
+        db.Database.CloseConnection();
+    }
+}
