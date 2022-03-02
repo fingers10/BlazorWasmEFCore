@@ -1,0 +1,45 @@
+name: github pages
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the code
+      - uses: actions/checkout@v2
+
+      # Install .NET Core SDK
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 6.0.x
+          
+      # Install dotnet wasm buildtools workload
+      - name: Install .NET WASM Build Tools
+        run: dotnet workload install wasm-tools
+          
+      # publishes Blazor project to the release-folder
+      - name: Publish .NET Core Project
+        run: dotnet publish BlazorWasmEFCore/BlazorWasmEFCore.csproj -c Release -o dist/BlazorWasmEFCore --nologo
+              
+      # copy index.html to 404.html to serve the same file when a file is not found
+      - name: Copy index.html to 404.html
+        run: cp dist/BlazorWasmEFCore/wwwroot/index.html dist/BlazorWasmEFCore/wwwroot/404.html
+
+      # add .nojekyll file to tell GitHub pages to not treat this as a Jekyll project. (Allow files and folders starting with an underscore)
+      - name: Add .nojekyll file
+        run: touch dist/BlazorWasmEFCore/wwwroot/.nojekyll
+
+      - name: Commit wwwroot to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@3.7.1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages
+          FOLDER: dist/BlazorWasmEFCore/wwwroot
